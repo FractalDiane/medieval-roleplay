@@ -132,12 +132,15 @@ fun main(args: Array<String>) {
 		}
 
 		if (currentReplacedCandidate != null) {
-			val replacement = currentReplacedCandidate.replacements.replacements.random()
+			val replacementChance = if (currentReplacedCandidate.replacements.allowNoWhitespace) REPLACEMENT_CHANCE_NO_WHITESPACE else REPLACEMENT_CHANCE
+			if (randomChance(replacementChance)) {
+				val replacement = currentReplacedCandidate.replacements.replacements.random()
 
-			inText.delete(currentReplacedCandidate.index, currentReplacedCandidate.index + currentReplacedCandidate.fromString.length)
-			inText.insert(currentReplacedCandidate.index, replacement)
+				inText.delete(currentReplacedCandidate.index, currentReplacedCandidate.index + currentReplacedCandidate.fromString.length)
+				inText.insert(currentReplacedCandidate.index, replacement)
 
-			outerIndex = currentReplacedCandidate.index + replacement.length
+				outerIndex = currentReplacedCandidate.index + replacement.length
+			}
 		}
 
 		++outerIndex
