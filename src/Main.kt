@@ -1,7 +1,22 @@
 import java.io.File
+import kotlin.random.Random
+
+data class LineParseResult(val fromValues: List<FromString>, val toValues: List<String>)
+data class FromString(val string: String, val allowNoWhitespace: Boolean)
+data class ReplacementList(val replacements: List<String>, val allowNoWhitespace: Boolean)
+data class ReplacementCandidate(val fromString: String, val replacements: ReplacementList, val index: Int)
+
+const val PREFIX_CHANCE = 0.3f
+const val POSTFIX_CHANCE = 0.3f
+const val REPLACEMENT_CHANCE = 0.5f
+const val REPLACEMENT_CHANCE_NO_WHITESPACE = 0.1f
+
+fun randomChance(chance: Float): Boolean {
+	return Random.nextFloat() <= chance
+}
 
 object RoleplayData {
-	var replacements: MutableMap<String, List<String>> = mutableMapOf()
+	var replacements: MutableMap<String, ReplacementList> = mutableMapOf()
 	var prefixes: MutableList<String> = mutableListOf()
 	var postfixes: MutableList<String> = mutableListOf()
 
@@ -16,21 +31,31 @@ object RoleplayData {
 	}
 }
 
-data class LineParseResult(val fromValues: List<String>, val toValues: List<String>)
-
 fun readRoleplayLine(line: String, startInFromValue: Boolean): LineParseResult {
-	val fromValues: MutableList<String> = mutableListOf()
+	val fromValues: MutableList<FromString> = mutableListOf()
 	val toValues: MutableList<String> = mutableListOf()
 
 	val currentValue = StringBuilder()
 	var inQuotes = false
 	var inFromValue = startInFromValue
+	var currentAllowNoWhitespace = false
+
+	fun addCurrentValue() {
+		if (inFromValue) {
+			fromValues.add(FromString(currentValue.toString(), currentAllowNoWhitespace))
+		} else {
+			toValues.add(currentValue.toString())
+		}
+	}
+
 	for (char in line) {
 		when (char) {
 			',' -> {
 				if (!inQuotes) {
-					(if (inFromValue) fromValues else toValues).add(currentValue.toString())
+					addCurrentValue()
+
 					inFromValue = false
+					currentAllowNoWhitespace = false
 					currentValue.clear()
 				} else {
 					currentValue.append(char)
@@ -39,26 +64,27 @@ fun readRoleplayLine(line: String, startInFromValue: Boolean): LineParseResult {
 
 			'"' -> inQuotes = !inQuotes
 			'#' -> inFromValue = true
+			'$' -> currentAllowNoWhitespace = true
 			else -> {
 				currentValue.append(char)
 			}
 		}
 	}
 
-	(if (inFromValue) fromValues else toValues).add(currentValue.toString())
+	addCurrentValue()
 
 	return LineParseResult(fromValues, toValues)
 }
 
-fun readRoleplayData(file: String, intoList: MutableList<String>?, intoMap: MutableMap<String, List<String>>?) {
-	val readerReplacements = File(file).bufferedReader()
-	readerReplacements.forEachLine { line ->
+fun readRoleplayData(file: String, intoList: MutableList<String>?, intoMap: MutableMap<String, ReplacementList>?) {
+	val reader = File(file).bufferedReader()
+	reader.forEachLine { line ->
 		if (line.isNotEmpty()) {
 			val lineData = readRoleplayLine(line, intoMap != null)
 			if (intoMap != null) {
 				for (entry in lineData.fromValues) {
-					intoMap[entry] = lineData.toValues
-					RoleplayData.updateMaxLength(entry)
+					intoMap[entry.string] = ReplacementList(lineData.toValues, entry.allowNoWhitespace)
+					RoleplayData.updateMaxLength(entry.string)
 				}
 			} else {
 				intoList?.addAll(lineData.toValues)
@@ -78,12 +104,12 @@ fun main(args: Array<String>) {
 	readRoleplayData("insults_adjectives.csv", RoleplayData.insultsAdjectives, null)
 	readRoleplayData("insults_nouns.csv", RoleplayData.insultsNouns, null)
 
-	var inText = args[0]
+	val inText = StringBuilder(args[0])
 
 	var outerIndex = 0
 	while (outerIndex < inText.length) {
 		val currentReplaced = StringBuilder()
-		var currentReplacedCandidate: Triple<String, List<String>, Int>? = null
+		var currentReplacedCandidate: ReplacementCandidate? = null
 		for (innerIndex in 0..<RoleplayData.maxReplacedLength) {
 			val totalIndex = outerIndex + innerIndex
 			if (totalIndex >= inText.length) {
@@ -96,25 +122,39 @@ fun main(args: Array<String>) {
 			val replacements = RoleplayData.replacements[currentReplacedString]
 			if (replacements != null) {
 				val startIndex = totalIndex - currentReplacedString.length + 1
-				if ((startIndex - 1 < 0 || inText[startIndex - 1].isWhitespace()) && (totalIndex + 1 >= inText.length || inText[totalIndex + 1].isWhitespace())) {
-					currentReplacedCandidate = Triple(currentReplacedString, replacements, startIndex)
+
+				val atLineStart = startIndex - 1 < 0
+				val atLineEnd = startIndex + 1 >= inText.length
+				if (replacements.allowNoWhitespace || ((atLineStart || inText[startIndex - 1].isWhitespace()) && (atLineEnd || inText[totalIndex + 1].isWhitespace()))) {
+					currentReplacedCandidate = ReplacementCandidate(currentReplacedString, replacements, startIndex)
 				}
 			}
 		}
 
 		if (currentReplacedCandidate != null) {
-			val replacement = currentReplacedCandidate.second.random()
+			val replacement = currentReplacedCandidate.replacements.replacements.random()
 
-			val builder = StringBuilder(inText)
-			builder.delete(currentReplacedCandidate.third, currentReplacedCandidate.third + currentReplacedCandidate.first.length)
-			builder.insert(currentReplacedCandidate.third, replacement)
+			inText.delete(currentReplacedCandidate.index, currentReplacedCandidate.index + currentReplacedCandidate.fromString.length)
+			inText.insert(currentReplacedCandidate.index, replacement)
 
-			inText = builder.toString()
-			outerIndex = currentReplacedCandidate.third + replacement.length
+			outerIndex = currentReplacedCandidate.index + replacement.length
 		}
 
 		++outerIndex
 	}
 
-	println(inText)
+	if (randomChance(PREFIX_CHANCE)) {
+		inText.insert(0, RoleplayData.prefixes.random())
+	}
+
+	if (randomChance(POSTFIX_CHANCE)) {
+		when (inText.last()) {
+			'.', ',', '!', '?' -> {}
+			else -> inText.append('.')
+		}
+
+		inText.append(RoleplayData.postfixes.random())
+	}
+
+	println(inText.toString())
 }
