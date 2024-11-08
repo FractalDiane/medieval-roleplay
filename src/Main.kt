@@ -66,11 +66,15 @@ fun readRoleplayLine(line: String, startInFromValue: Boolean): LineParseResult {
 		when (char) {
 			',' -> {
 				if (!inQuotes) {
-					addCurrentValue()
+					if (currentValue.isNotEmpty()) {
+						addCurrentValue()
 
-					inFromValue = false
-					currentAllowNoWhitespace = false
-					currentValue.clear()
+						inFromValue = false
+						currentAllowNoWhitespace = false
+						currentValue.clear()
+					} else {
+						break
+					}
 				} else {
 					currentValue.append(char)
 				}
@@ -85,7 +89,9 @@ fun readRoleplayLine(line: String, startInFromValue: Boolean): LineParseResult {
 		}
 	}
 
-	addCurrentValue()
+	if (currentValue.isNotEmpty()) {
+		addCurrentValue()
+	}
 
 	return LineParseResult(fromValues, toValues)
 }
