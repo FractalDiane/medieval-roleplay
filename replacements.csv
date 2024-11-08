@@ -69,3 +69,5 @@ scout,lookout,outrider,spotter,explorer,patroller,runner,advance guard
 soldier,champion,mercenary,shovelman,warrior
 sniper,hunter,ranger,woodsman,beastmaster,australian,archer,bowman,arrowman,fletcher
 spy,cutpurse,pickpocket,vagabond,blackguard,hooligan,pilferer,backstabber,thief,haunt,rogue
+
+#idiot,#fool,#bastard,"<adj>, <adj> <nou>"

@@ -23,12 +23,26 @@ object RoleplayData {
 	var insultsAdjectives: MutableList<String> = mutableListOf()
 	var insultsNouns: MutableList<String> = mutableListOf()
 
+	var bodyParts: MutableList<String> = mutableListOf()
+	var bodyPartAdjectives: MutableList<String> = mutableListOf()
+	var gods: MutableList<String> = mutableListOf()
+	var godAdjectives: MutableList<String> = mutableListOf()
+
 	var maxReplacedLength = 0
 	fun updateMaxLength(text: String) {
 		if (text.length > maxReplacedLength) {
 			maxReplacedLength = text.length
 		}
 	}
+
+	val fileFetchReplacements = mapOf(
+		"<god>" to gods,
+		"<goda>" to godAdjectives,
+		"<bop>" to bodyParts,
+		"<bopa>" to bodyPartAdjectives,
+		"<adj>" to insultsAdjectives,
+		"<nou>" to insultsNouns,
+	)
 }
 
 fun readRoleplayLine(line: String, startInFromValue: Boolean): LineParseResult {
@@ -101,10 +115,15 @@ fun main(args: Array<String>) {
 	readRoleplayData("replacements.csv", null, RoleplayData.replacements)
 	readRoleplayData("prefixes.csv", RoleplayData.prefixes, null)
 	readRoleplayData("postfixes.csv", RoleplayData.postfixes, null)
+
 	readRoleplayData("insults_adjectives.csv", RoleplayData.insultsAdjectives, null)
 	readRoleplayData("insults_nouns.csv", RoleplayData.insultsNouns, null)
+	readRoleplayData("body_parts.csv", RoleplayData.bodyParts, null)
+	readRoleplayData("body_part_adjectives.csv", RoleplayData.bodyPartAdjectives, null)
+	readRoleplayData("gods.csv", RoleplayData.gods, null)
+	readRoleplayData("god_adjectives.csv", RoleplayData.godAdjectives, null)
 
-	val inText = StringBuilder(args[0])
+	var inText = StringBuilder(args[0])
 
 	var outerIndex = 0
 	while (outerIndex < inText.length) {
@@ -157,6 +176,12 @@ fun main(args: Array<String>) {
 		}
 
 		inText.append(RoleplayData.postfixes.random())
+	}
+
+	for (entry in RoleplayData.fileFetchReplacements) {
+		while (inText.contains(entry.key)) {
+			inText = StringBuilder(inText.replaceFirst(entry.key.toRegex(), entry.value.random()))
+		}
 	}
 
 	println(inText.toString())
